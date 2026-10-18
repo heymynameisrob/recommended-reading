@@ -1,0 +1,26 @@
+{
+  "name": "personal-archive",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check",
+    "dev": "pnpm --filter @archive/worker run dev",
+    "deploy": "pnpm --filter @archive/worker run deploy",
+    "cf": "pnpm --filter @archive/worker run cf",
+    "db:local": "pnpm --filter @archive/worker run db:local",
+    "db:remote": "pnpm --filter @archive/worker run db:remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261018.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

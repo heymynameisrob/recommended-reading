@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "useTabs": false,
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": false,
+  "ignorePatterns": [
+    "**/*.md",
+    "**/node_modules/**",
+    "**/.wrangler/**",
+    "backups/**",
+    "pnpm-lock.yaml"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "personal-archive",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {},
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "archive",
+      "database_id": "4cd34f45-236e-42a3-a06b-e5cb374bfc1d",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "personal-archive-artifacts"
+    }
+  ],
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "JOBS",
+        "queue": "archive-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "archive-jobs",
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "archive-jobs-dlq"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  }
+}

@@ -5,6 +5,6 @@ export interface Env {
   ARTIFACTS: R2Bucket;
   BROWSER: Fetcher;
   JOBS: Queue<CollectionMessage>;
-  ARCHIVE_API_KEY: string;
+  ARCHIVE_API_KEY?: string;
   X_API_BEARER_TOKEN?: string;
 }

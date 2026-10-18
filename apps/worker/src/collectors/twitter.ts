@@ -31,6 +31,7 @@ const timelineSchema = z.object({
 /** Accept an X/Twitter profile URL or numeric List URL, not arbitrary API paths. */
 function parseTarget(value: string) {
   const url = new URL(value);
+
   if (
     url.protocol !== "https:" ||
     !["x.com", "www.x.com", "twitter.com", "www.twitter.com"].includes(url.hostname) ||
@@ -40,9 +41,12 @@ function parseTarget(value: string) {
   ) {
     throw new Error("Twitter source must be an HTTPS x.com or twitter.com URL");
   }
+
   const list = /^\/i\/lists\/(\d+)\/?$/.exec(url.pathname);
+
   if (list) return { kind: "list" as const, id: list[1] };
   const profile = /^\/([A-Za-z0-9_]{1,15})\/?$/.exec(url.pathname);
+
   if (
     profile &&
     !["home", "explore", "search", "settings", "notifications", "messages", "i"].includes(
@@ -51,13 +55,21 @@ function parseTarget(value: string) {
   ) {
     return { kind: "profile" as const, username: profile[1] };
   }
+
   throw new Error("Use a profile URL or https://x.com/i/lists/LIST_ID");
 }
 
 /** Send the API credential only to the fixed X API origin, without redirects. */
-async function requestX(path: string, token: string, params?: URLSearchParams) {
+async function requestX<Payload>(
+  path: string,
+  schema: z.ZodType<Payload>,
+  token: string,
+  params?: URLSearchParams,
+): Promise<Payload> {
   const url = new URL(`https://api.x.com/2/${path}`);
+
   if (params) url.search = params.toString();
+
   const response = await fetchSourceText(
     url.href,
     {
@@ -66,7 +78,8 @@ async function requestX(path: string, token: string, params?: URLSearchParams) {
     },
     true,
   );
-  return JSON.parse(response) as unknown;
+
+  return schema.parse(JSON.parse(response));
 }
 
 /** Collect the latest 100 posts from a public profile or accessible X List. */
@@ -77,35 +90,44 @@ export async function collectTwitter(
   if (!bearerToken) throw new Error("X_API_BEARER_TOKEN is required for Twitter collection");
   const target = parseTarget(source.url);
   let path: string;
+
   if (target.kind === "list") {
     path = `lists/${target.id}/tweets`;
   } else {
-    const lookup = z
-      .object({ data: userSchema })
-      .parse(
-        await requestX(`users/by/username/${encodeURIComponent(target.username)}`, bearerToken),
-      );
+    const lookup = await requestX(
+      `users/by/username/${encodeURIComponent(target.username)}`,
+      z.object({ data: userSchema }),
+      bearerToken,
+    );
+
     path = `users/${lookup.data.id}/tweets`;
   }
+
   const params = new URLSearchParams({
     max_results: "100",
     "tweet.fields": "created_at,author_id,note_tweet",
     expansions: "author_id",
     "user.fields": "username,name",
   });
-  const timeline = timelineSchema.parse(await requestX(path, bearerToken, params));
+
+  const timeline = await requestX(path, timelineSchema, bearerToken, params);
+
   if (timeline.errors?.length)
     throw new Error("X API returned partial errors; collection will retry");
+
   if (!timeline.data && timeline.meta?.result_count !== 0)
     throw new Error("X API response is missing timeline data");
   const authors = new Map((timeline.includes?.users ?? []).map((user) => [user.id, user.username]));
   const items: CollectedItem[] = [];
+
   for (const tweet of timeline.data ?? []) {
     const author = tweet.author_id ? authors.get(tweet.author_id) : undefined;
     const content = (tweet.note_tweet?.text ?? tweet.text).slice(0, 100_000);
+
     const url = author
       ? `https://x.com/${author}/status/${tweet.id}`
       : `https://x.com/i/web/status/${tweet.id}`;
+
     const publishedAt = tweet.created_at ? parsePublishedAt(tweet.created_at) : undefined;
     items.push({
       externalId: tweet.id,
@@ -118,5 +140,6 @@ export async function collectTwitter(
       artifacts: [],
     });
   }
+
   return items;
 }

@@ -4,6 +4,16 @@ export interface Source {
   url: string;
 }
 
+/** Add a source and enable scheduled collection unless disabled by the caller. */
+export async function addSource(db: D1Database, source: Source, enabled = true) {
+  await db
+    .prepare("INSERT INTO sources (id, kind, url, enabled) VALUES (?, ?, ?, ?)")
+    .bind(source.id, source.kind, source.url, enabled ? 1 : 0)
+    .run();
+
+  return { ...source, enabled };
+}
+
 export interface CollectionMessage {
   jobId: string;
   sourceId: string;
@@ -17,6 +27,7 @@ export async function searchItems(db: D1Database, query: string, limit = 20) {
     )
     .bind(query, limit)
     .all();
+
   return result.results;
 }
 
@@ -28,6 +39,7 @@ export async function recentItems(db: D1Database, limit = 20) {
     )
     .bind(limit)
     .all();
+
   return result.results;
 }
 
@@ -49,13 +61,10 @@ interface CollectionSummary {
 }
 
 /** Read one page using a stable order, including items with equal collection times. */
-export async function recentCollections(
-  db: D1Database,
-  limit = 20,
-  cursor?: CollectionCursor,
-) {
+export async function recentCollections(db: D1Database, limit = 20, cursor?: CollectionCursor) {
   const columns =
     "SELECT id, source_id, url, title, collected_at, screenshot_key, external_id, author, published_at FROM items";
+
   const statement = cursor
     ? db
         .prepare(
@@ -63,9 +72,11 @@ export async function recentCollections(
         )
         .bind(cursor.collectedAt, cursor.id, limit + 1)
     : db.prepare(`${columns} ORDER BY collected_at DESC, id DESC LIMIT ?`).bind(limit + 1);
+
   const result = await statement.all<CollectionSummary>();
   const items = result.results.slice(0, limit);
   const last = items[items.length - 1];
+
   const nextCursor =
     result.results.length > limit && last
       ? btoa(JSON.stringify({ collectedAt: last.collected_at, id: last.id }))
@@ -73,6 +84,7 @@ export async function recentCollections(
           .replace(/\//g, "_")
           .replace(/=+$/, "")
       : null;
+
   return { items, nextCursor };
 }
 

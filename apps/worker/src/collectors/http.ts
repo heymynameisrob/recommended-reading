@@ -11,24 +11,30 @@ export async function fetchSourceText(
     redirect: authenticated ? "error" : "follow",
     signal: AbortSignal.timeout(30_000),
   });
+
   if (!response.ok) {
     await response.body?.cancel();
     throw new Error(`Source request failed with HTTP ${response.status}`);
   }
+
   if (!response.body) throw new Error("Source response has no body");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let bytes = 0;
   let text = "";
+
   try {
     while (true) {
       const chunk = await reader.read();
+
       if (chunk.done) break;
       bytes += chunk.value.byteLength;
+
       if (bytes > MAX_RESPONSE_BYTES) throw new Error("Source response exceeds 2 MiB");
       text += decoder.decode(chunk.value, { stream: true });
     }
+
     return text + decoder.decode();
   } finally {
     await reader.cancel();
@@ -36,12 +42,18 @@ export async function fetchSourceText(
   }
 }
 
+/** Stable identity and content fields that derive one archived item's content hash. */
+export interface HashInput {
+  [field: string]: string | undefined;
+}
+
 /** Hash stable entry identity and content so equal-text posts remain separate items. */
-export async function hashEntry(value: unknown) {
+export async function hashEntry(value: HashInput) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(JSON.stringify(value)),
   );
+
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -49,6 +61,7 @@ export async function hashEntry(value: unknown) {
 export function resolveArticleUrl(value: string, base: string) {
   try {
     const url = new URL(value, base);
+
     return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
   } catch {
     return undefined;
@@ -58,5 +71,6 @@ export function resolveArticleUrl(value: string, base: string) {
 /** Normalize valid publication dates without replacing absent dates with collection time. */
 export function parsePublishedAt(value: string) {
   const timestamp = Date.parse(value);
+
   return Number.isNaN(timestamp) ? undefined : new Date(timestamp).toISOString();
 }
